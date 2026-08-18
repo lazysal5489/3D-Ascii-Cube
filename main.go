@@ -13,17 +13,26 @@ import (
 	"time"
 )
 
+const (
+	faceFront = iota
+	faceRight
+	faceLeft
+	faceBack
+	faceBottom
+	faceTop
+)
+
 type CubeRenderer struct {
 	width, height int
 
 	zBuffer []float64
 	buffer  []byte
 
-	A, B, C float64
+	angleX, angleY, angleZ float64
 
 	cubeWidth       float64
 	distanceFromCam float64
-	zoomlevel       float64
+	zoomLevel       float64
 	out             *bufio.Writer
 }
 
@@ -32,24 +41,24 @@ func NewCubeRenderer(w, h int) *CubeRenderer {
 		width: w, height: h,
 		zBuffer: make([]float64, w*h),
 		buffer:  make([]byte, w*h),
-		A:       0, B: 0, C: 0,
+		angleX:  0, angleY: 0, angleZ: 0,
 		cubeWidth:       20,
 		distanceFromCam: 100,
-		zoomlevel:       30,
+		zoomLevel:       30,
 		out:             bufio.NewWriter(os.Stdout),
 	}
 }
 
 func (cr *CubeRenderer) CalculateX(i, j, k float64) float64 {
-	return i*math.Cos(cr.C)*math.Cos(cr.B) + j*(math.Cos(cr.C)*math.Sin(cr.B)*math.Sin(cr.A)-math.Sin(cr.C)*math.Cos(cr.A)) + k*(math.Cos(cr.C)*math.Sin(cr.B)*math.Cos(cr.A)+math.Sin(cr.C)*math.Sin(cr.A))
+	return i*math.Cos(cr.angleZ)*math.Cos(cr.angleY) + j*(math.Cos(cr.angleZ)*math.Sin(cr.angleY)*math.Sin(cr.angleX)-math.Sin(cr.angleZ)*math.Cos(cr.angleX)) + k*(math.Cos(cr.angleZ)*math.Sin(cr.angleY)*math.Cos(cr.angleX)+math.Sin(cr.angleZ)*math.Sin(cr.angleX))
 }
 
 func (cr *CubeRenderer) CalculateY(i, j, k float64) float64 {
-	return i*math.Sin(cr.C)*math.Cos(cr.B) + j*(math.Sin(cr.C)*math.Sin(cr.B)*math.Sin(cr.A)+math.Cos(cr.C)*math.Cos(cr.A)) + k*(math.Sin(cr.C)*math.Sin(cr.B)*math.Cos(cr.A)-math.Cos(cr.C)*math.Sin(cr.A))
+	return i*math.Sin(cr.angleZ)*math.Cos(cr.angleY) + j*(math.Sin(cr.angleZ)*math.Sin(cr.angleY)*math.Sin(cr.angleX)+math.Cos(cr.angleZ)*math.Cos(cr.angleX)) + k*(math.Sin(cr.angleZ)*math.Sin(cr.angleY)*math.Cos(cr.angleX)-math.Cos(cr.angleZ)*math.Sin(cr.angleX))
 }
 
 func (cr *CubeRenderer) CalculateZ(i, j, k float64) float64 {
-	return i*-math.Sin(cr.B) + j*math.Cos(cr.B)*math.Sin(cr.A) + k*math.Cos(cr.B)*math.Cos(cr.A)
+	return i*-math.Sin(cr.angleY) + j*math.Cos(cr.angleY)*math.Sin(cr.angleX) + k*math.Cos(cr.angleY)*math.Cos(cr.angleX)
 }
 
 func ClearScreen() {
@@ -88,44 +97,40 @@ func (cr *CubeRenderer) DrawPoint(x, y, z float64, character byte) {
 	}
 
 	// Project it to 3d
-	oneoverz := 1 / zp
-	screenx := int(float64(cr.width)/2 + cr.zoomlevel*oneoverz*xp*2)
-	screeny := int(float64(cr.height)/2 + cr.zoomlevel*oneoverz*yp*2)
+	oneOverZ := 1 / zp
+	screenX := int(float64(cr.width)/2 + cr.zoomLevel*oneOverZ*xp*2)
+	screenY := int(float64(cr.height)/2 + cr.zoomLevel*oneOverZ*yp*2)
 
 	// Check the screen bound
-	if screenx < 0 || screenx >= cr.width || screeny < 0 || screeny >= cr.height {
+	if screenX < 0 || screenX >= cr.width || screenY < 0 || screenY >= cr.height {
 		return
 	}
 
 	// Converts 3d screen coords to 1D for buffers
-	index := screeny*cr.width + screenx
+	index := screenY*cr.width + screenX
 
 	// zBuffer[index] = 1/z of the nearest point drawn here so far (bigger = closer).
-	if oneoverz > cr.zBuffer[index] {
-		cr.zBuffer[index] = oneoverz // New closer point
+	if oneOverZ > cr.zBuffer[index] {
+		cr.zBuffer[index] = oneOverZ // New closer point
 		cr.buffer[index] = character // Update visible pixel to match
 	}
 }
 
 func (cr *CubeRenderer) RenderCube() {
-	incrrement := 0.8 // density of each side
+	increment := 0.8 // density of each side
 
-	chars := []byte{'@', '#', '%', '.', '=', '^'}
+	chars := []byte{'@', '#', '%', '*', '&', '$'}
 
-	for x := -cr.cubeWidth; x < cr.cubeWidth; x += incrrement {
-		for y := -cr.cubeWidth; y < cr.cubeWidth; y += incrrement {
-			// front side
-			cr.DrawPoint(x, y, -cr.cubeWidth, chars[0])
-			// right side
-			cr.DrawPoint(cr.cubeWidth, y, x, chars[1])
-			// left side
-			cr.DrawPoint(-cr.cubeWidth, y, -x, chars[2])
-			// back side
-			cr.DrawPoint(-x, y, cr.cubeWidth, chars[3])
-			// bottom side
-			cr.DrawPoint(x, -cr.cubeWidth, -y, chars[4])
-			// top side
-			cr.DrawPoint(x, cr.cubeWidth, y, chars[5])
+	// Render the character each side of the cube
+
+	for x := -cr.cubeWidth; x < cr.cubeWidth; x += increment {
+		for y := -cr.cubeWidth; y < cr.cubeWidth; y += increment {
+			cr.DrawPoint(x, y, -cr.cubeWidth, chars[faceFront])
+			cr.DrawPoint(cr.cubeWidth, y, x, chars[faceRight])
+			cr.DrawPoint(-cr.cubeWidth, y, -x, chars[faceLeft])
+			cr.DrawPoint(-x, y, cr.cubeWidth, chars[faceBack])
+			cr.DrawPoint(x, -cr.cubeWidth, -y, chars[faceBottom])
+			cr.DrawPoint(x, cr.cubeWidth, y, chars[faceTop])
 		}
 	}
 }
@@ -156,9 +161,9 @@ func (cr *CubeRenderer) Display() {
 }
 
 func (cr *CubeRenderer) Rotate() {
-	cr.A += 0.05
-	cr.B += 0.05
-	cr.C += 0.01
+	cr.angleX += 0.05
+	cr.angleY += 0.05
+	cr.angleZ += 0.01
 }
 
 func (cr *CubeRenderer) Run() {
@@ -183,7 +188,7 @@ func (cr *CubeRenderer) Run() {
 		os.Exit(0)
 	}()
 
-	//  incase we do the if statement to quick the program
+	//  In case we do the if statement to quick the program
 	defer cleanup()
 
 	for {
