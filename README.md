@@ -11,6 +11,7 @@ First I learned Go, then I thought maybe I should build something to see if I ac
 ```bash
 git clone https://github.com/lazysal5489/3D-Ascii-Cube.git
 cd 3D-Ascii-Cube
+go run main.go
 ```
 
 ## How it works
