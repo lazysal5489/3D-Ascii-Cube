@@ -91,12 +91,12 @@ func (cr *CubeRenderer) DrawPoint(x, y, z float64, character byte) {
 	yp := cr.CalculateY(x, y, z)
 	zp := cr.CalculateZ(x, y, z) + float64(cr.distanceFromCam)
 
-	// Check if it behind , if behind than we skip drawing this point
+	// If the point is behind camera, skip drawing it
 	if zp <= 0 {
 		return
 	}
 
-	// Project it to 3d
+	// Project 3D point to 2D coord
 	oneOverZ := 1 / zp
 	screenX := int(float64(cr.width)/2 + cr.zoomLevel*oneOverZ*xp*2)
 	screenY := int(float64(cr.height)/2 + cr.zoomLevel*oneOverZ*yp*2)
@@ -106,7 +106,7 @@ func (cr *CubeRenderer) DrawPoint(x, y, z float64, character byte) {
 		return
 	}
 
-	// Converts 3d screen coords to 1D for buffers
+	// Converts 2D screen coords to 1D index for buffers
 	index := screenY*cr.width + screenX
 
 	// zBuffer[index] = 1/z of the nearest point drawn here so far (bigger = closer).
@@ -121,7 +121,7 @@ func (cr *CubeRenderer) RenderCube() {
 
 	chars := []byte{'@', '#', '%', '*', '&', '$'}
 
-	// Render the character each side of the cube
+	// Render the character each on side of the cube
 
 	for x := -cr.cubeWidth; x < cr.cubeWidth; x += increment {
 		for y := -cr.cubeWidth; y < cr.cubeWidth; y += increment {
@@ -141,7 +141,7 @@ func (cr *CubeRenderer) Display() {
 	// Pre-allocate the frame
 	frame.Grow(cr.width*cr.height + cr.height)
 
-	// Move cursor  home
+	// Move cursor home
 	frame.WriteString("\x1b[H")
 
 	// Build a frame
@@ -188,11 +188,11 @@ func (cr *CubeRenderer) Run() {
 		os.Exit(0)
 	}()
 
-	//  In case we do the if statement to quick the program
+	// Ensure cleanup still runs if Run() returns for any other reason
 	defer cleanup()
 
 	for {
-		// reset buffer, ensuring each fram starts clean
+		// reset buffer, ensuring each frame starts clean
 		for i := range cr.buffer {
 			cr.buffer[i] = ' '
 		}
@@ -207,7 +207,7 @@ func (cr *CubeRenderer) Run() {
 		cr.Display()
 		cr.Rotate()
 
-		// wait
+		// Wait
 		time.Sleep(16 * time.Millisecond)
 	}
 }
