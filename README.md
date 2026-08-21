@@ -43,3 +43,5 @@ Building this project was so much fun, and I also learned new stuff too. I reall
 ## Demo
 
 ![Cube demo](assets/3D-Cube.gif)
+
+## Reminder English is not my first language
