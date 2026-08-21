@@ -22,11 +22,30 @@ const (
 	faceTop
 )
 
+const (
+	colorWhite  = 37
+	colorYellow = 33
+	colorRed    = 31
+	colorOrange = 91
+	colorGreen  = 32
+	colorBlue   = 34
+)
+
+var faceColors = [6]int{
+	faceFront:  colorRed,
+	faceBack:   colorOrange,
+	faceRight:  colorGreen,
+	faceLeft:   colorBlue,
+	faceTop:    colorWhite,
+	faceBottom: colorYellow,
+}
+
 type CubeRenderer struct {
 	width, height int
 
-	zBuffer []float64
-	buffer  []byte
+	zBuffer     []float64
+	buffer      []byte
+	colorBuffer []int
 
 	angleX, angleY, angleZ float64
 
@@ -39,9 +58,10 @@ type CubeRenderer struct {
 func NewCubeRenderer(w, h int) *CubeRenderer {
 	return &CubeRenderer{
 		width: w, height: h,
-		zBuffer: make([]float64, w*h),
-		buffer:  make([]byte, w*h),
-		angleX:  0, angleY: 0, angleZ: 0,
+		zBuffer:     make([]float64, w*h),
+		buffer:      make([]byte, w*h),
+		colorBuffer: make([]int, w*h),
+		angleX:      0, angleY: 0, angleZ: 0,
 		cubeWidth:       20,
 		distanceFromCam: 100,
 		zoomLevel:       30,
@@ -86,7 +106,7 @@ func ShowCursor() {
 	fmt.Print("\033[?25h")
 }
 
-func (cr *CubeRenderer) DrawPoint(x, y, z float64, character byte) {
+func (cr *CubeRenderer) DrawPoint(x, y, z float64, character byte, color int) {
 	xp := cr.CalculateX(x, y, z)
 	yp := cr.CalculateY(x, y, z)
 	zp := cr.CalculateZ(x, y, z) + float64(cr.distanceFromCam)
@@ -111,8 +131,9 @@ func (cr *CubeRenderer) DrawPoint(x, y, z float64, character byte) {
 
 	// zBuffer[index] = 1/z of the nearest point drawn here so far (bigger = closer).
 	if oneOverZ > cr.zBuffer[index] {
-		cr.zBuffer[index] = oneOverZ // New closer point
-		cr.buffer[index] = character // Update visible pixel to match
+		cr.zBuffer[index] = oneOverZ  // New closer point
+		cr.buffer[index] = character  // Update visible pixel to match
+		cr.colorBuffer[index] = color // Put color to char that draw at that point
 	}
 }
 
@@ -125,12 +146,12 @@ func (cr *CubeRenderer) RenderCube() {
 
 	for x := -cr.cubeWidth; x < cr.cubeWidth; x += increment {
 		for y := -cr.cubeWidth; y < cr.cubeWidth; y += increment {
-			cr.DrawPoint(x, y, -cr.cubeWidth, chars[faceFront])
-			cr.DrawPoint(cr.cubeWidth, y, x, chars[faceRight])
-			cr.DrawPoint(-cr.cubeWidth, y, -x, chars[faceLeft])
-			cr.DrawPoint(-x, y, cr.cubeWidth, chars[faceBack])
-			cr.DrawPoint(x, -cr.cubeWidth, -y, chars[faceBottom])
-			cr.DrawPoint(x, cr.cubeWidth, y, chars[faceTop])
+			cr.DrawPoint(x, y, -cr.cubeWidth, chars[faceFront], faceColors[faceFront])
+			cr.DrawPoint(cr.cubeWidth, y, x, chars[faceRight], faceColors[faceRight])
+			cr.DrawPoint(-cr.cubeWidth, y, -x, chars[faceLeft], faceColors[faceLeft])
+			cr.DrawPoint(-x, y, cr.cubeWidth, chars[faceBack], faceColors[faceBack])
+			cr.DrawPoint(x, -cr.cubeWidth, -y, chars[faceBottom], faceColors[faceBottom])
+			cr.DrawPoint(x, cr.cubeWidth, y, chars[faceTop], faceColors[faceTop])
 		}
 	}
 }
@@ -139,16 +160,48 @@ func (cr *CubeRenderer) Display() {
 	var frame strings.Builder
 
 	// Pre-allocate the frame
-	frame.Grow(cr.width*cr.height + cr.height)
+	frame.Grow(cr.width*cr.height*8 + cr.height)
 
 	// Move cursor home
 	frame.WriteString("\x1b[H")
 
+	lastColor := -1
+
 	// Build a frame
 	for y := 0; y < cr.height; y++ {
-		start := y * cr.width
+		for x := 0; x < cr.width; x++ {
+			idx := y*cr.width + x
+			ch := cr.buffer[idx]
 
-		frame.Write(cr.buffer[start : start+cr.width])
+			// Check if it empty than we don't need to apply any color
+			if ch == ' ' {
+				if lastColor != -1 {
+					frame.WriteString("\x1b[0m")
+					lastColor = -1
+				}
+
+				// Skip the whole body and run the loop again
+				frame.WriteByte(' ')
+				continue
+			}
+
+			// Check the color from DrawPoint
+			color := cr.colorBuffer[idx]
+
+			// Than print it to frame if color is not the same as current color
+			if color != lastColor {
+				fmt.Fprintf(&frame, "\x1b[%dm", color)
+			}
+
+			// Write character to frame
+			frame.WriteByte(ch)
+		}
+
+		// After the loop end than reset the lastColor
+		if lastColor != -1 {
+			frame.WriteString("\x1b[0m")
+			lastColor = -1
+		}
 
 		frame.WriteByte('\n')
 	}
