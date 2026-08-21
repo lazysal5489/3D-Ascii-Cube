@@ -34,7 +34,7 @@ Under the hood, the cube uses rotation matrices to compute vertex positions each
 
 ## Possible Improvements
 
-- Add color to each side of cube
+- Add color to each side of cube. (Already implement it )
 
 ## Conclusion
 
